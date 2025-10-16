@@ -1,0 +1,272 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String?
+  firstName String
+  lastName  String
+  phone     String?
+  role      UserRole @default(CLIENT)
+  isVerified Boolean @default(false)
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  professionalProfile ProfessionalProfile?
+  appointments        Appointment[]        @relation("ClientAppointments")
+  professionalAppointments Appointment[]   @relation("ProfessionalAppointments")
+  reviews             Review[]
+  payments            Payment[]
+  notifications       Notification[]
+  favorites           Favorite[]
+  addresses           Address[]
+
+  @@map("users")
+}
+
+model ProfessionalProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  bio             String
+  categories      ServiceCategory[]
+  skills          String[]
+  experienceYears Int
+  certifications  String[]
+  portfolioUrls   String[]
+  availability    String
+  serviceRadius   Int
+  website         String?
+  socialMedia     Json?
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+  isVerified      Boolean  @default(false)
+  isAvailable     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services Service[]
+  reviews  Review[]  @relation("ProfessionalReviews")
+
+  @@map("professional_profiles")
+}
+
+model Service {
+  id                String        @id @default(cuid())
+  professionalId    String
+  title             String
+  description       String
+  category          ServiceCategory
+  type              ServiceType
+  price             Float
+  duration          Int // in minutes
+  skills            String[]
+  images            String[]
+  availability      String
+  location          String?
+  requirements      String?
+  cancellationPolicy String?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  reviews      Review[]
+
+  @@map("services")
+}
+
+model Appointment {
+  id            String            @id @default(cuid())
+  serviceId     String
+  professionalId String
+  clientId      String
+  scheduledAt   DateTime
+  type          AppointmentType
+  status        AppointmentStatus @default(PENDING)
+  notes         String?
+  location      String?
+  videoCallLink String?
+  paymentId     String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relations
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  professional User    @relation("ProfessionalAppointments", fields: [professionalId], references: [id], onDelete: Cascade)
+  client      User    @relation("ClientAppointments", fields: [clientId], references: [id], onDelete: Cascade)
+  payment     Payment? @relation(fields: [paymentId], references: [id])
+  reviews     Review[]
+
+  @@map("appointments")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  userId        String
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  method        PaymentMethod
+  transactionId String?
+  stripePaymentIntentId String?
+  stripeChargeId String?
+  refundId      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointment Appointment?
+
+  @@map("payments")
+}
+
+model Review {
+  id            String   @id @default(cuid())
+  serviceId     String?
+  professionalId String?
+  appointmentId String?
+  userId        String
+  rating        Int      @db.SmallInt
+  comment       String?
+  images        String[]
+  response      String?
+  responseAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  service     Service?             @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  professional ProfessionalProfile? @relation("ProfessionalReviews", fields: [professionalId], references: [id], onDelete: Cascade)
+  appointment Appointment?         @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model Notification {
+  id        String             @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Favorite {
+  id            String @id @default(cuid())
+  userId        String
+  professionalId String
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  professional ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, professionalId])
+  @@map("favorites")
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  country   String  @default("BR")
+  isDefault Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+// Enums
+enum UserRole {
+  CLIENT
+  PROFESSIONAL
+  ADMIN
+}
+
+enum ServiceCategory {
+  BEAUTY
+  HEALTH
+  EDUCATION
+  TECHNOLOGY
+  HOME
+  BUSINESS
+  TRANSPORT
+  OTHER
+}
+
+enum ServiceType {
+  ONLINE
+  IN_PERSON
+  BOTH
+}
+
+enum AppointmentType {
+  ONLINE
+  IN_PERSON
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+  BANK_TRANSFER
+}
+
+enum NotificationType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_REMINDER
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  REVIEW_RECEIVED
+  MESSAGE_RECEIVED
+  SYSTEM_UPDATE
+}
