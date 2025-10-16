@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  # Banco de dados principal
+  postgres:
+    image: postgres:15-alpine
+    container_name: mechama-postgres
+    environment:
+      POSTGRES_DB: mechama
+      POSTGRES_USER: mechama
+      POSTGRES_PASSWORD: mechama123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mechama-network
+
+  # Cache Redis
+  redis:
+    image: redis:7-alpine
+    container_name: mechama-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mechama-network
+
+  # Elasticsearch para busca
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: mechama-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - mechama-network
+
+  # RabbitMQ para mensageria
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: mechama-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: mechama
+      RABBITMQ_DEFAULT_PASS: mechama123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - mechama-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: mechama-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - JWT_SECRET=your-super-secret-jwt-key
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - mechama-network
+
+  # User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+    container_name: mechama-user-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mechama-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: mechama-auth-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - JWT_SECRET=your-super-secret-jwt-key
+      - GOOGLE_CLIENT_ID=your-google-client-id
+      - GOOGLE_CLIENT_SECRET=your-google-client-secret
+      - FACEBOOK_APP_ID=your-facebook-app-id
+      - FACEBOOK_APP_SECRET=your-facebook-app-secret
+    depends_on:
+      - postgres
+    networks:
+      - mechama-network
+
+  # Search Service
+  search-service:
+    build:
+      context: .
+      dockerfile: services/search-service/Dockerfile
+    container_name: mechama-search-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+    depends_on:
+      - elasticsearch
+      - postgres
+    networks:
+      - mechama-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+  rabbitmq_data:
+
+networks:
+  mechama-network:
+    driver: bridge
