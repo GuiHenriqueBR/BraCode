@@ -1,0 +1,48 @@
+{
+  "name": "mechama",
+  "version": "1.0.0",
+  "description": "Plataforma digital que conecta clientes a prestadores de serviços",
+  "private": true,
+  "workspaces": [
+    "backend/*",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend/gateway && npm install && cd ../services/auth && npm install && cd ../users && npm install && cd ../services && npm install && cd ../payments && npm install && cd ../notifications && npm install && cd ../scheduling && npm install && cd ../reviews && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "concurrently \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:users\" \"npm run dev:services\" \"npm run dev:payments\" \"npm run dev:notifications\" \"npm run dev:scheduling\" \"npm run dev:reviews\"",
+    "dev:gateway": "cd backend/gateway && npm run start:dev",
+    "dev:auth": "cd backend/services/auth && npm run start:dev",
+    "dev:users": "cd backend/services/users && npm run start:dev",
+    "dev:services": "cd backend/services/services && npm run start:dev",
+    "dev:payments": "cd backend/services/payments && npm run start:dev",
+    "dev:notifications": "cd backend/services/notifications && npm run start:dev",
+    "dev:scheduling": "cd backend/services/scheduling && npm run start:dev",
+    "dev:reviews": "cd backend/services/reviews && npm run start:dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend/gateway && npm run build && cd ../services/auth && npm run build && cd ../users && npm run build && cd ../services && npm run build && cd ../payments && npm run build && cd ../notifications && npm run build && cd ../scheduling && npm run build && cd ../reviews && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend/gateway && npm run test && cd ../services/auth && npm run test && cd ../users && npm run test && cd ../services && npm run test && cd ../payments && npm run test && cd ../notifications && npm run test && cd ../scheduling && npm run test && cd ../reviews && npm run test",
+    "test:frontend": "cd frontend && npm run test",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend/gateway && npm run lint && cd ../services/auth && npm run lint && cd ../users && npm run lint && cd ../services && npm run lint && cd ../payments && npm run lint && cd ../notifications && npm run lint && cd ../scheduling && npm run lint && cd ../reviews && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

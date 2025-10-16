@@ -1,0 +1,239 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: mechama-postgres
+    environment:
+      POSTGRES_DB: mechama
+      POSTGRES_USER: mechama
+      POSTGRES_PASSWORD: mechama123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - mechama-network
+
+  # Redis para cache e sessões
+  redis:
+    image: redis:7-alpine
+    container_name: mechama-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mechama-network
+
+  # MongoDB para dados não estruturados
+  mongodb:
+    image: mongo:7
+    container_name: mechama-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mechama
+      MONGO_INITDB_ROOT_PASSWORD: mechama123
+      MONGO_INITDB_DATABASE: mechama
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - mechama-network
+
+  # Elasticsearch para busca
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: mechama-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - mechama-network
+
+  # API Gateway
+  gateway:
+    build:
+      context: ./backend/gateway
+      dockerfile: Dockerfile
+    container_name: mechama-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-jwt-secret-key
+      - STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mechama-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/services/auth
+      dockerfile: Dockerfile
+    container_name: mechama-auth
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-jwt-secret-key
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mechama-network
+
+  # Users Service
+  users-service:
+    build:
+      context: ./backend/services/users
+      dockerfile: Dockerfile
+    container_name: mechama-users
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mechama-network
+
+  # Services Service
+  services-service:
+    build:
+      context: ./backend/services/services
+      dockerfile: Dockerfile
+    container_name: mechama-services
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+    networks:
+      - mechama-network
+
+  # Payments Service
+  payments-service:
+    build:
+      context: ./backend/services/payments
+      dockerfile: Dockerfile
+    container_name: mechama-payments
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+      - STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+      - STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mechama-network
+
+  # Notifications Service
+  notifications-service:
+    build:
+      context: ./backend/services/notifications
+      dockerfile: Dockerfile
+    container_name: mechama-notifications
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URL=mongodb://mechama:mechama123@mongodb:27017/mechama
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+    networks:
+      - mechama-network
+
+  # Scheduling Service
+  scheduling-service:
+    build:
+      context: ./backend/services/scheduling
+      dockerfile: Dockerfile
+    container_name: mechama-scheduling
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_CALENDAR_API_KEY=your_google_calendar_api_key
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mechama-network
+
+  # Reviews Service
+  reviews-service:
+    build:
+      context: ./backend/services/reviews
+      dockerfile: Dockerfile
+    container_name: mechama-reviews
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://mechama:mechama123@postgres:5432/mechama
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mechama-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mechama-frontend
+    ports:
+      - "3008:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    depends_on:
+      - gateway
+    networks:
+      - mechama-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data:
+  elasticsearch_data:
+
+networks:
+  mechama-network:
+    driver: bridge
