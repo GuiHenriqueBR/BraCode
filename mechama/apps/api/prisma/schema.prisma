@@ -1,0 +1,369 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  CLIENT
+  PROFESSIONAL
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+  BANK_TRANSFER
+}
+
+enum ServiceType {
+  ONLINE
+  IN_PERSON
+  HYBRID
+}
+
+enum NotificationType {
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  PAYMENT_PROCESSED
+  REVIEW_RECEIVED
+  MESSAGE_RECEIVED
+  SYSTEM_ANNOUNCEMENT
+}
+
+// Models
+model User {
+  id                String      @id @default(cuid())
+  email             String      @unique
+  password          String?
+  firstName         String
+  lastName          String
+  phone             String?
+  avatar            String?
+  role              UserRole    @default(CLIENT)
+  status            UserStatus  @default(PENDING)
+  emailVerified     Boolean     @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  addresses         Address[]
+  professional      Professional?
+  client            Client?
+  bookingsAsClient  Booking[]    @relation("ClientBookings")
+  bookingsAsPro     Booking[]    @relation("ProfessionalBookings")
+  reviewsAsClient   Review[]     @relation("ClientReviews")
+  reviewsAsPro      Review[]     @relation("ProfessionalReviews")
+  notifications     Notification[]
+  paymentMethods    PaymentMethod[]
+  oauthAccounts     OAuthAccount[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id            String  @id @default(cuid())
+  provider      String
+  providerId    String
+  accessToken   String?
+  refreshToken  String?
+  expiresAt     DateTime?
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("oauth_accounts")
+}
+
+model Address {
+  id          String  @id @default(cuid())
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  street      String
+  number      String
+  complement  String?
+  neighborhood String
+  city        String
+  state       String
+  zipCode     String
+  country     String  @default("Brasil")
+  isDefault   Boolean @default(false)
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+model Professional {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio             String?
+  specialties     String[]
+  experience      Int?      // anos de experiência
+  hourlyRate      Decimal?  @db.Decimal(10, 2)
+  isAvailable     Boolean   @default(true)
+  rating          Float     @default(0)
+  totalReviews    Int       @default(0)
+  completedJobs   Int       @default(0)
+  responseTime    Int?      // em minutos
+  isVerified      Boolean   @default(false)
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  services        Service[]
+  certifications  Certification[]
+  portfolio       PortfolioItem[]
+  availability    Availability[]
+  bankAccount     BankAccount?
+
+  @@map("professionals")
+}
+
+model Client {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferences   Json?    // preferências do cliente
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("clients")
+}
+
+model Certification {
+  id              String       @id @default(cuid())
+  professionalId  String
+  professional    Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  name            String
+  issuer          String
+  issueDate       DateTime
+  expiryDate      DateTime?
+  credentialId    String?
+  credentialUrl   String?
+  imageUrl        String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("certifications")
+}
+
+model PortfolioItem {
+  id              String       @id @default(cuid())
+  professionalId  String
+  professional    Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  imageUrl        String
+  projectUrl      String?
+  completedAt     DateTime
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("portfolio_items")
+}
+
+model Service {
+  id              String      @id @default(cuid())
+  professionalId  String
+  professional    Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  categoryId      String
+  category        Category    @relation(fields: [categoryId], references: [id])
+  title           String
+  description     String
+  price           Decimal     @db.Decimal(10, 2)
+  duration        Int         // em minutos
+  type            ServiceType @default(IN_PERSON)
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  bookings        Booking[]
+
+  @@map("services")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  icon        String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  services    Service[]
+
+  @@map("categories")
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  clientId        String
+  client          User          @relation("ClientBookings", fields: [clientId], references: [id])
+  professionalId  String
+  professional    User          @relation("ProfessionalBookings", fields: [professionalId], references: [id])
+  serviceId       String
+  service         Service       @relation(fields: [serviceId], references: [id])
+  status          BookingStatus @default(PENDING)
+  scheduledAt     DateTime
+  completedAt     DateTime?
+  notes           String?
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  platformFee     Decimal       @db.Decimal(10, 2) // 15% da plataforma
+  professionalAmount Decimal    @db.Decimal(10, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  payment         Payment?
+  review          Review?
+
+  @@map("bookings")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  bookingId       String        @unique
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount          Decimal       @db.Decimal(10, 2)
+  platformFee     Decimal       @db.Decimal(10, 2)
+  professionalAmount Decimal    @db.Decimal(10, 2)
+  status          PaymentStatus @default(PENDING)
+  method          PaymentMethod
+  stripePaymentId String?
+  stripeChargeId  String?
+  processedAt     DateTime?
+  refundedAt      DateTime?
+  refundAmount    Decimal?      @db.Decimal(10, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+model PaymentMethod {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            PaymentMethod
+  isDefault       Boolean       @default(false)
+  stripePaymentMethodId String?
+  last4           String?
+  brand           String?
+  expiryMonth     Int?
+  expiryYear      Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("payment_methods")
+}
+
+model BankAccount {
+  id              String       @id @default(cuid())
+  professionalId  String       @unique
+  professional    Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  bankCode        String
+  agency          String
+  account         String
+  accountDigit    String
+  accountType     String       // conta corrente, poupança
+  holderName      String
+  holderDocument  String
+  isVerified      Boolean      @default(false)
+  stripeAccountId String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("bank_accounts")
+}
+
+model Review {
+  id              String   @id @default(cuid())
+  bookingId       String   @unique
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  clientId        String
+  client          User     @relation("ClientReviews", fields: [clientId], references: [id])
+  professionalId  String
+  professional    User     @relation("ProfessionalReviews", fields: [professionalId], references: [id])
+  rating          Int      // 1-5
+  comment         String?
+  response        String?
+  responseAt      DateTime?
+  isVisible       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("reviews")
+}
+
+model Availability {
+  id              String       @id @default(cuid())
+  professionalId  String
+  professional    Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  dayOfWeek       Int          // 0-6 (domingo-sábado)
+  startTime       String       // HH:MM
+  endTime         String       // HH:MM
+  isAvailable     Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("availability")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?            // dados adicionais
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
