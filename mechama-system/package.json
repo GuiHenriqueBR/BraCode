@@ -1,0 +1,37 @@
+{
+  "name": "mechama-system",
+  "version": "1.0.0",
+  "description": "Plataforma digital que conecta clientes a prestadores de serviços",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:services\"",
+    "dev:gateway": "cd services/api-gateway && npm run dev",
+    "dev:services": "concurrently \"cd services/user-service && npm run dev\" \"cd services/auth-service && npm run dev\" \"cd services/search-service && npm run dev\"",
+    "dev:web": "cd apps/web && npm run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "db:migrate": "cd packages/database && npm run migrate",
+    "db:seed": "cd packages/database && npm run seed",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "k8s:deploy": "kubectl apply -f infrastructure/k8s/",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "concurrently": "^8.2.2",
+    "turbo": "^1.11.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
